@@ -43,42 +43,15 @@ app.use(session({
   }
 }))
 
-// middleware to verify token
-const verifyJWT = (req, res, next) => {
-  const token = req.headers["x-access-token"]   // take token from header  
-
-  // check a token in header
-  if (token) {
-    // verify token (token, secret, (error, decoded))
-    jwt.verify(token, "jwtSecret", (err, decode) => {
-      if (err)  {
-        res.send({ auth: false, msg: "Failed to verify", from: "verifyJWT" })
-      } else {
-        req.userId = decode.id
-        next()
-      }
-    })
-  } else {
-    res.send({ auth: false, msg: "No token", from: "verifyJWT" })
-  }
-}
-
 /* ENDPOINTS */
 
 // route to check if user is already logged in
 app.get("/login", (req, res) => {
   if (req.session.user) {
-    return res.json({ auth: true, user: req.session.user[0], from: "post/api/login" })
+    return res.send({ logged: true, user: req.session.user[0] })
   } else {
-    return res.json({ auth: false, msg: "not-logged", from: "get/api/login" })
+    return res.send({ logged: false })
   }
-})
-
-
-// check if user is authenticated
-app.get("/isAuth", verifyJWT, (req, res) => {
-  // res.send({auth: false, msg:})
-  return res.json({ auth: true, msg: "is auth", from: "get/api/isAuth"})
 })
 
 
@@ -96,23 +69,16 @@ app.post("/login", (req, res) => {
       if (result.length > 0) {
         bcrypt.compare(pwd, result[0].hash, (error, resp) => {
           if (resp) {
-
-            const id = result[0]['id']      // use user id
-            const token = jwt.sign(
-              { id },                       // pass user id
-              "jwtSecrete",                 // keep it .env
-              { expiresIn: 60 * 50, }       // 5min life
-            )
-
             req.session.user = result
+            console.log(req.session.user)
 
-            return res.json({ auth: true, token: token, result: result[0], from: "post/api/login"})
+            return res.send(result)
           } else {
-            return res.json({ auth: false, msg: "Incorrect username or password", from: "post/api/login" })
+            return res.send({ err: "Incorrect username or password" })
           }
         })
       } else {
-        return res.send({ auth: false, msg: "User dose not exist", from: "post/api/login" })
+        return res.send({ err: "User dose not exist" })
       }
     }
   )
@@ -139,7 +105,7 @@ app.post("/register", (req, res) => {
 
   // return error 
   if (validError) {
-    return res.json({ auth: false, msg: validError, from: "post/api/register" })
+    return res.send({ err: validError })
   }
 
   // try to insert entry
@@ -149,9 +115,9 @@ app.post("/register", (req, res) => {
       "INSERT INTO tb_users (name, surname, phone, email, hash) VALUES(?, ?, ?, ?, ?)",
       [name, surname, phone, email, hash],
       (err, result) => {
-        if (err) return res.json({ auth: false, msg: err.sqlMessage, from: "post/api/register" }) // return error from sql
+        if (err) return res.send({ err: err.sqlMessage }) // return error from sql
 
-        return res.json({ auth: true, result: result[0], from: "post/api/register" }) // return resp if everything is Ok
+        return res.send(result) // return resp if everything is Ok
       }
     )
   })
